@@ -1,0 +1,73 @@
+# 初版 AutoDL 单卡 LoRA 配置（D-08），未用于最终权重（最终流程见 train.sh）。基线与 AMD 参考样例 Reproduce_Guide §7.1 的 LoRA 路径一致：
+# action expert LoRA、无 teacher（align_params 为空）、post_training=false。
+# 路径与 configs/platform/autodl.env 一致；由 src/launch_train.py 读取。
+
+platform:
+  robotwin_root: /root/autodl-tmp/RoboTwin
+  python: /root/autodl-tmp/envs/rt/bin/python
+  base_config: /root/autodl-tmp/RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/training/lingbotvla_cli.yaml
+  source_dir: /root/autodl-tmp/RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/source/lingbot-vla-v2
+  model_root: /root/autodl-tmp/RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/models
+  data_list: /root/autodl-tmp/runtime/robotwin_demo_clean_joint_v30.txt   # prepare_data.sh 校验后的清单
+  env_profile: configs/env/cuda.env
+
+run:
+  output_dir: /root/autodl-tmp/runtime/outputs/lora_run
+  gpu_count: 1
+  gpu_ids: "0"
+  micro_batch_size: 2             # smoke_mem 2026-10-13：fp32 布局 mb2 峰值 27.2 GB / 32 GB，约 38–48 s/step（gbs 32，CPU 有争用）
+  global_batch_size: 32
+  max_steps: 500                  # 首轮约 5.5 h（~40 s/step，gbs 32），按 6 h 训练预算（2026-10-13）
+  save_steps: 100                 # 约 1 h 一次
+  dcp_keep: 1                     # 实测 LoRA DCP 含全量 fp32 权重约 24 GB；170 GB 盘只放得下 1 个
+  seen_instruction_pool: /root/autodl-tmp/runtime/seen_instruction_pool.json   # D-06
+  enable_resume: true
+  compile_flex: false              # LINGBOT_COMPILE_FLEX：只编译 flex attention（profile 2026-10-13 定）
+  fsdp_single_gpu: false           # LINGBOT_FSDP_SINGLE_GPU：单卡也套 FSDP2，使 bf16 混合精度生效（D-09；parity 通过前保持 false）
+  require_resume: true
+  stop_file: /root/autodl-tmp/runtime/STOP
+  num_workers: 8
+  prefetch_factor: 4
+
+train:
+  optimizer: adamw
+  lr: 1.0e-4
+  lr_min: 5.0e-5
+  lr_decay_style: cosine
+  use_lora: true
+  lora_scope: action_expert
+  lora_rank: 32                   # AMD 示例为 8；单任务能力受限，取 32，冒烟时观察显存
+  lora_alpha: 64
+  train_expert_only: false
+  data_parallel_mode: fsdp2
+  data_parallel_replicate_size: 1
+  enable_gradient_checkpointing: true
+  enable_full_shard: true
+  enable_mixed_precision: true    # AMD 验证的布局：权重 fp32、计算 bf16。false（bf16 基座）实测在 state_proj 处 Float/BFloat16 dtype 不匹配（2026-10-13）
+  enable_fp32: false
+  enable_fsdp_offload: false      # smoke_mem 显存阶梯最后一档会设 true（需 fsdp1）
+  use_compile: false
+  seed: 42
+  enable_profiling: false         # scripts/autodl/profile_train.sh 打开，记录 [profile_start_step, profile_end_step)
+  profile_start_step: 3
+  profile_end_step: 4
+  profile_trace_dir: /root/autodl-tmp/runtime/profile/trace
+  profile_record_shapes: false
+  profile_profile_memory: false
+  profile_with_stack: false
+
+data:
+  image_augment: true             # D-05
+  use_future_image: false         # 无 teacher 不需要未来帧
+  norm_stats_file: /root/autodl-tmp/runtime/norm_stats_clean.json   # D-07
+  robot_config_root: configs/robot_autodl
+
+model:
+  post_training: false            # 与 AMD LoRA 路径一致（影响 expert_visual 权重映射）
+  model_dir: robbyant_lingbot-vla-v2-6b
+  tokenizer_dir: Qwen3-VL-4B-Instruct-config-tokenizer
+  init_path: null
+  attn_implementation: flash_attention_2      # vGPU 若不支持 flash-attn（如 sm_120）：--set model.attn_implementation=sdpa
+  vit_attn_implementation: flash_attention_2  # 同上；部署从打包的 lingbotvla_cli.yaml 读取同一设置
+
+align_params_file: null           # 不使用 depth / DINO-video teacher

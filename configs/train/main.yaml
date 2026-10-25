@@ -1,0 +1,60 @@
+# 初版 AMD 方案，未用于最终权重（已被 D-08 取代）。
+# 主训练配置（单主线）。依据：docs/decisions.md D-01..D-05；超参来源见各行注释。
+# 由 src/launch_train.py 读取，转成 tasks.vla.train_lingbotvla 的命令行覆盖项。
+
+platform:                         # Radeon Cloud `robotwin` 镜像（external-data）路径
+  robotwin_root: /RoboTwin
+  python: /opt/robotwin-env/bin/python
+  base_config: /RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/training/lingbotvla_cli.yaml
+  source_dir: /RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/source/lingbot-vla-v2
+  model_root: /RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/models
+  data_list: /workspace/runtime/robotwin_demo_clean_joint_v30.txt   # setup.sh 校验后的副本
+  env_profile: configs/env/rocm.env
+
+run:
+  output_dir: /workspace/runtime/outputs/main_run
+  gpu_count: 8
+  gpu_ids: "0,1,2,3,4,5,6,7"
+  micro_batch_size: 16            # Reproduce_Guide §8.1 容量表：8 卡 mb16 峰值 41.3 GiB
+  global_batch_size: 256
+  max_steps: 30000                # T0 时用 tools/budget.py 重算后改这里
+  save_steps: 1000                # 冒烟实测保存耗时后再定
+  dcp_keep: 1                     # LINGBOT_DCP_KEEP，见 src/lingbot_patches/dcp_rotation.py
+  seen_instruction_pool: /workspace/runtime/seen_instruction_pool.json  # D-06；null = 不替换
+  enable_resume: true
+  compile_flex: false              # LINGBOT_COMPILE_FLEX：只编译 flex attention（profile 2026-10-13 定）
+  fsdp_single_gpu: false           # LINGBOT_FSDP_SINGLE_GPU：单卡也套 FSDP2，使 bf16 混合精度生效（D-09；parity 通过前保持 false）
+  require_resume: true            # LINGBOT_REQUIRE_RESUME：有 checkpoint 却没加载成功时直接报错
+  stop_file: /workspace/runtime/STOP  # LINGBOT_STOP_FILE：touch 后在当前 step 结束时保存并退出
+  num_workers: 8                  # 官方 robotwin.yaml
+  prefetch_factor: 4
+
+train:                            # 覆盖 base_config 的 --train.* 项
+  optimizer: adamw                # D-03：冒烟验证 muon 后再定
+  lr: 1.0e-4                      # 官方 robotwin.yaml
+  lr_min: 5.0e-5
+  lr_decay_style: cosine
+  use_lora: false
+  train_expert_only: false
+  data_parallel_mode: fsdp2
+  data_parallel_replicate_size: 1
+  enable_gradient_checkpointing: true
+  enable_full_shard: true
+  enable_fp32: true               # D-04：官方值，冒烟失败则回退 false
+  use_compile: true               # D-04：官方值，冒烟失败则回退 false
+  precompute_grid_thw: true       # 官方值
+  seed: 42
+
+data:
+  image_augment: true             # D-05
+  norm_stats_file: /workspace/runtime/norm_stats_clean.json   # D-07：clean-only，setup.sh 计算；部署读取此字段
+  robot_config_root: configs/robot  # 仓库相对路径；训练读取其中 robotwin.yaml 的 norm_stats（须与上一行一致）
+  use_future_image: true          # teacher_mode full 需要
+
+model:
+  post_training: true
+  model_dir: robbyant_lingbot-vla-v2-6b
+  tokenizer_dir: Qwen3-VL-4B-Instruct-config-tokenizer
+  init_path: null                 # 非空时作为 --model.model_path（例：/workspace 未保留时从阶段一 HF 权重续训）
+
+align_params_file: configs/train/align_official.yaml

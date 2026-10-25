@@ -1,0 +1,17 @@
+# 推理参数扫描任务子集（docs/specs/eval.md E6）：按全局 20000 clean 30 ep 成功率分四档，每档用 random.Random(0) 抽 4 个
+place_dual_shoes
+place_fan
+stack_blocks_three
+stamp_seal
+move_pillbottle_pad
+press_stapler
+place_object_scale
+pick_diverse_bottles
+place_a2b_left
+adjust_bottle
+place_object_basket
+rotate_qrcode
+click_bell
+open_laptop
+place_burger_fries
+place_empty_cup

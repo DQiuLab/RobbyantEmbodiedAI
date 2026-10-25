@@ -1,0 +1,14 @@
+diff --git a/deploy/lingbot_vla_v2_policy.py b/deploy/lingbot_vla_v2_policy.py
+index 5282667..943c9be 100644
+--- a/deploy/lingbot_vla_v2_policy.py
++++ b/deploy/lingbot_vla_v2_policy.py
+@@ -356,6 +356,9 @@ class LingbotVLAv2Server:
+         if 'vocab_size' in training_config['model'] and training_config['model']['vocab_size'] != 0:
+             config.vocab_size = training_config['model']['vocab_size']
+         # config.num_steps = 4
++        if os.environ.get("LINGBOT_NUM_STEPS"):  # override denoising steps at inference (docs/specs/eval.md E6)
++            config.num_steps = int(os.environ["LINGBOT_NUM_STEPS"])
++            print(f"num_steps overridden to {config.num_steps}")
+         config.use_cache = True # is necessary in inference
+         # load processors
+         self.processor = build_processor(base_model_path)

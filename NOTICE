@@ -1,0 +1,37 @@
+RobbyantEmbodiedAI
+Copyright 2026 BotLab
+
+This repository is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party components
+----------------------
+
+1. LingBot-VLA-v2 (https://github.com/robbyant/lingbot-vla-v2), Apache License 2.0.
+   - The patches in src/patches/ are modifications of LingBot-VLA-v2 source files
+     at commit 951475a, and are distributed under the Apache License 2.0.
+   - configs/reference/upstream_robot_robotwin.yaml is a copy of
+     configs/robot_configs/robotwin.yaml from LingBot-VLA-v2 at commit 951475a,
+     unmodified apart from a leading source comment.
+
+2. lingbotvla_cli.yaml from the Hugging Face model repository
+   robbyant/lingbot-vla-v2-6b-robotwin is used only as a hyperparameter reference
+   (its weights are not used). That repository does not state a license, so the
+   file is NOT redistributed here; configs/reference/README.md gives its URL and
+   sha256 for users who want to download it.
+
+3. The following are fetched at setup time by scripts/autodl/setup_env.sh and
+   scripts/autodl/fetch_assets.sh and are NOT redistributed in this repository:
+   - RoboTwin 2.0 (https://github.com/RoboTwin-Platform/RoboTwin), MIT License
+   - XPolicyLab (RoboTwin submodule, commit c37109c), Apache License 2.0
+   - Robotwin-radeon-cloud (https://github.com/ZiguanWang/Robotwin-radeon-cloud),
+     the AMD code reference sample listed in the challenge introduction; its
+     reproduction patches are applied at setup time
+   - Model weights: robbyant/lingbot-vla-v2-6b
+   - Configuration and tokenizer files of Qwen3-VL-4B-Instruct
+     (https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct)
+
+4. The challenge materials (rules, templates) belong to the organizers and are
+   not included; they are publicly available at
+   https://tianchi.aliyun.com/competition/entrance/532514.
+   The tests generate a structure-only results template (task names and zero
+   counts) at run time instead of using the organizers' file.

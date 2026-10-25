@@ -1,0 +1,29 @@
+diff --git a/lingbotvla/data/vla_data/base_dataset.py b/lingbotvla/data/vla_data/base_dataset.py
+index 30f121f..e411ce2 100644
+--- a/lingbotvla/data/vla_data/base_dataset.py
++++ b/lingbotvla/data/vla_data/base_dataset.py
+@@ -40,6 +40,7 @@ from datasets import load_dataset as _hf_load_dataset
+ 
+ from ...utils import logging
+ from .utils import FeatureTransform
++from .seen_instructions import sampler_from_env
+ from .video_utils import decode_video_frames
+ 
+ 
+@@ -224,6 +225,7 @@ class VLADataset(Dataset):
+ 
+         self.return_item = return_item
+         self.transform = transform
++        self.seen_instruction_sampler = sampler_from_env()
+ 
+     def __len__(self):
+         return len(self.dataset)
+@@ -277,6 +279,8 @@ class VLADataset(Dataset):
+ 
+     def getitem(self, idx):
+         raw_item = self.check_lerobot_item(self.dataset[idx])
++        if self.seen_instruction_sampler is not None and "task" in raw_item:
++            raw_item["task"] = self.seen_instruction_sampler(raw_item["task"])
+         if (
+             self.use_future_image
+             and "future_video_effective_fps" not in raw_item

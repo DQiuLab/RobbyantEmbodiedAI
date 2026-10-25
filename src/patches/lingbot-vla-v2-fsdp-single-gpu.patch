@@ -1,0 +1,15 @@
+diff --git a/lingbotvla/distributed/parallel_state.py b/lingbotvla/distributed/parallel_state.py
+index e78a67b..c2aa3cb 100644
+--- a/lingbotvla/distributed/parallel_state.py
++++ b/lingbotvla/distributed/parallel_state.py
+@@ -268,6 +268,10 @@ class ParallelState:
+ 
+     @property
+     def fsdp_enabled(self) -> bool:
++        # LINGBOT_FSDP_SINGLE_GPU=1: also wrap with FSDP2 on one GPU, so the bf16 MixedPrecisionPolicy applies.
++        # Without it a single-GPU run keeps the model.float() copy and computes every GEMM in fp32/TF32.
++        if os.environ.get("LINGBOT_FSDP_SINGLE_GPU", "") == "1" and self.dp_mode == "fsdp2":
++            return True
+         return self.fsdp_size > 1
+ 
+     @property

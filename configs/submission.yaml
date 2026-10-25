@@ -1,0 +1,5 @@
+# 提交元数据。team_id 需自行填写天池队伍 ID（占位符 "<team_id>" 会被 tools/results.py 拒绝）。
+team_name: BotLab
+team_id: "<team_id>"
+# 主办方模板，需自行从比赛页面获取并放到此路径（不随仓库分发）
+template_json: Robbyant-Embodied-AI-Challenge/必读_模板和目录要求/灵波2026/初赛评测结果模板_JSON版.json

@@ -1,0 +1,41 @@
+diff --git a/tasks/vla/train_lingbotvla.py b/tasks/vla/train_lingbotvla.py
+index 2e6cb08..325844d 100644
+--- a/tasks/vla/train_lingbotvla.py
++++ b/tasks/vla/train_lingbotvla.py
+@@ -126,9 +126,10 @@ class MyTrainingArguments(TrainingArguments):
+     )
+     lora_rank: int = field(default=8, metadata={"help": "LoRA rank."})
+     lora_alpha: int = field(default=16, metadata={"help": "LoRA alpha."})
+-    lora_scope: Literal["action_expert", "all_attention"] = field(
++    lora_scope: Literal["action_expert", "all_attention", "vlm_expert_full"] = field(
+         default="action_expert",
+-        metadata={"help": "Apply LoRA to action expert attention or all attention layers."},
++        metadata={"help": "Apply LoRA to action expert attention or all attention layers; vlm_expert_full: "
++                          "LoRA on VLM (vision + language) attention, every non-VLM parameter trained fully."},
+     )
+     lora_target_modules: str = field(
+         default="q_proj,k_proj,v_proj,o_proj",
+@@ -404,6 +405,11 @@ def main():
+                 r".*qwenvl_with_expert\.qwen_expert\..*\."
+                 r"(q_proj|k_proj|v_proj|o_proj)"
+             )
++        elif args.train.lora_scope == "vlm_expert_full":
++            target_pattern = (
++                r".*qwenvl_with_expert\.qwenvl\..*\."
++                r"(q_proj|k_proj|v_proj|o_proj|attn\.qkv|attn\.proj)"
++            )
+         else:
+             target_pattern = args.train.lora_target_modules
+         model = add_lora_to_model(
+@@ -413,6 +419,11 @@ def main():
+             lora_target_modules=target_pattern,
+             lora_target_modules_support=None,
+         )
++        if args.train.lora_scope == "vlm_expert_full":
++            for name, param in model.named_parameters():
++                if ".qwenvl_with_expert.qwenvl." not in f".{name}":
++                    param.requires_grad = True
++                    param.data = param.data.to(torch.float32)
+         trainable = sum(param.numel() for param in model.parameters() if param.requires_grad)
+         total = sum(param.numel() for param in model.parameters())
+         logger.info_rank0(

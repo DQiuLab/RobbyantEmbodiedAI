@@ -1,0 +1,43 @@
+diff --git a/lingbotvla/models/vla/lingbot_vla/flex_attention.py b/lingbotvla/models/vla/lingbot_vla/flex_attention.py
+index 7fbc512..2f81926 100644
+--- a/lingbotvla/models/vla/lingbot_vla/flex_attention.py
++++ b/lingbotvla/models/vla/lingbot_vla/flex_attention.py
+@@ -17,6 +17,8 @@ import torch.nn.functional as F  # noqa: N812
+ from packaging.version import Version
+ import einops
+ 
++import os
++
+ FLEX_SPARSE_BLOCK_SIZE = 128
+ FLEX_KERNEL_OPTIONS = {"BLOCK_M": 32, "BLOCK_N": 64, "num_warps": 4, "num_stages": 2}
+ 
+@@ -181,6 +183,20 @@ def build_block_mask(
+     return block_mask
+ 
+ 
++_COMPILED_FLEX = None
++
++
++def _block_mask_flex_fn():
++    """LINGBOT_COMPILE_FLEX=1: use torch.compile(flex_attention). Uncompiled flex attention falls back to an
++    elementwise-index implementation (profiled on RTX 4080 SUPER: ~40% of each training step)."""
++    global _COMPILED_FLEX
++    if os.environ.get("LINGBOT_COMPILE_FLEX", "") != "1":
++        return flex_attention
++    if _COMPILED_FLEX is None:
++        _COMPILED_FLEX = torch.compile(flex_attention, dynamic=False)
++    return _COMPILED_FLEX
++
++
+ def flex_attention_with_block_mask(
+     query_states: torch.Tensor,
+     key_states: torch.Tensor,
+@@ -213,7 +229,7 @@ def flex_attention_with_block_mask(
+         key_states = F.pad(key_states, (0, 0, 0, pad_k), value=0.0)
+         value_states = F.pad(value_states, (0, 0, 0, pad_k), value=0.0)
+ 
+-    attn_output, _ = flex_attention(
++    attn_output, _ = _block_mask_flex_fn()(
+         query_states,
+         key_states,
+         value_states,

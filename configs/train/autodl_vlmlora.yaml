@@ -1,0 +1,76 @@
+# AutoDL 单卡：VLM（视觉 + 语言注意力）LoRA + 非 VLM 参数（action expert 等）全参，不带 teacher。路线 C，见 D-11（已采用：最终权重的 stage 1）。
+# 补丁 lingbot-vla-v2-vlm-lora-expert-full.patch 新增 lora_scope=vlm_expert_full。由 autodl_expert.yaml 派生（有测试）。
+# 与 autodl_lora.yaml 共用平台路径、数据清单、统计量、指令池；训练参数尽量取官方 official_robotwin_cli.yaml（不随仓库分发，见 configs/reference/README.md）的值。
+# micro batch / 步数 / 保存间隔已按 H800 80 GB 测速（EXP-20261015-01）确定。
+
+platform:
+  robotwin_root: /root/autodl-tmp/RoboTwin
+  python: /root/autodl-tmp/envs/rt/bin/python
+  base_config: /root/autodl-tmp/RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/training/lingbotvla_cli.yaml
+  source_dir: /root/autodl-tmp/RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/source/lingbot-vla-v2
+  model_root: /root/autodl-tmp/RoboTwin/experiments/lingbot_vla_v2_6b_robotwin/models
+  data_list: /root/autodl-tmp/runtime/robotwin_demo_clean_joint_v30.txt   # prepare_data.sh 校验后的清单
+  env_profile: configs/env/cuda.env
+
+run:
+  output_dir: /root/autodl-tmp/runtime/outputs/vlmlora_run
+  gpu_count: 1
+  gpu_ids: "0"
+  micro_batch_size: 16            # EXP-20261015-01：9.6 s/step，峰值 65.5 GB
+  global_batch_size: 128          # 官方 1024 / 50k 步超出预算
+  max_steps: 20000                # D-11：2026-10-15 定 C 20k（约 4.7 epoch，约 54 h）
+  stop_at_step: 7500              # 复现用（D-13，submission S3）：按 20k 余弦计划在 7500 保存并退出，stage 2 从这里接续
+  save_steps: 500                 # 实例可能中断：中断时最多丢 500 步（约 80 min）；HF 快照点须是其倍数
+  dcp_keep: 2                     # 一个 DCP 约 37 GB；keep=1 时先删旧再写新，保存中被杀会两头落空（D-13），复现时用 2，不影响训练结果
+  seen_instruction_pool: /root/autodl-tmp/runtime/seen_instruction_pool.json   # D-06
+  enable_resume: true
+  compile_flex: false             # use_compile=true 已覆盖（D-09）
+  fsdp_single_gpu: false          # bf16 提速选项（D-09，相对官方 fp32 的偏离）；最终取 false（官方 fp32）
+  require_resume: true
+  stop_file: /root/autodl-tmp/runtime/STOP
+  num_workers: 16                 # H800 机 20 核
+  prefetch_factor: 4
+
+train:
+  optimizer: adamw
+  lr: 1.0e-4                      # 官方值
+  lr_min: 5.0e-5
+  lr_decay_style: cosine
+  use_lora: true
+  lora_scope: vlm_expert_full     # 补丁新增：VLM 注意力 LoRA，非 VLM 参数全训
+  lora_rank: 32
+  lora_alpha: 64
+  train_expert_only: false        # 上游要求 use_lora 时为 false
+  data_parallel_mode: fsdp2
+  data_parallel_replicate_size: 1
+  enable_gradient_checkpointing: true   # 80 GB 下可测 false
+  enable_full_shard: true
+  enable_mixed_precision: true
+  enable_fp32: true               # 官方值（fp32/TF32 计算）；fsdp_single_gpu=true 时须改 false 才是 bf16
+  enable_fsdp_offload: false
+  use_compile: true               # 官方值；EXP-20261013-02 实测提速约 3–5 倍
+  precompute_grid_thw: true       # 官方值
+  seed: 42
+  enable_profiling: false
+  profile_start_step: 3
+  profile_end_step: 4
+  profile_trace_dir: /root/autodl-tmp/runtime/profile/trace
+  profile_record_shapes: false
+  profile_profile_memory: false
+  profile_with_stack: false
+
+data:
+  image_augment: true             # D-05
+  use_future_image: false         # 无 teacher 不需要未来帧
+  norm_stats_file: /root/autodl-tmp/runtime/norm_stats_clean.json   # D-07
+  robot_config_root: configs/robot_autodl
+
+model:
+  post_training: false            # 无 teacher 时模型不建对齐头，而基座 checkpoint 含 95 个对齐头键；true 会对多余键抛 KeyError（D-10）
+  model_dir: robbyant_lingbot-vla-v2-6b
+  tokenizer_dir: Qwen3-VL-4B-Instruct-config-tokenizer
+  init_path: null
+  attn_implementation: flash_attention_2
+  vit_attn_implementation: flash_attention_2
+
+align_params_file: null           # 不用 depth / DINO-video teacher

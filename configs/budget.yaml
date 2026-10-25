@@ -1,0 +1,13 @@
+# 初版 AMD 方案，未用于最终权重（已被 D-08 取代）。
+# tools/budget.py 默认参数。来源见 docs/decisions.md D-02。
+train_end: "2026-10-22T12:00"   # 训练最晚结束（自定）
+step_seconds: 24.68             # Reproduce_Guide §8.1 实测，8×W7900 mb16×ga2；冒烟后用实测覆盖
+gpus: 8
+stage1_credits: 600
+stage2_credits: 1600
+stage1_overhead_h: 6.0          # 冒烟 + 转换 + sanity 评测
+stage2_overhead_h: 50.0         # 中途 1000 ep (~15 h) + 最终 2000 ep (~30 h) + 转换
+stage_gap_h: 12.0               # 阶段间排队，未知，保守估计
+pre_train_end_overhead_h: 15.0  # 中途方向性评测会暂停训练
+cap_steps: 30000
+round_to: 500

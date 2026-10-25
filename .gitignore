@@ -1,0 +1,22 @@
+# 大文件与生成物不进 git
+/submission/
+data/
+checkpoints/
+outputs/
+third_party/
+*.safetensors
+*.pt
+*.pth
+*.distcp
+__pycache__/
+.pytest_cache/
+*.pyc
+# 官方模板压缩包解压出的 macOS 元数据
+__MACOSX/
+.deps/
+
+# 主办方赛事材料（版权属主办方，不随仓库分发；打包时放回此路径）与无许可证的上游文件副本
+Robbyant-Embodied-AI-Challenge/
+configs/reference/amd_base_cli.yaml
+configs/reference/official_robotwin_cli.yaml
+

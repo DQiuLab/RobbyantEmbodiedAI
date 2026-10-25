@@ -1,0 +1,45 @@
+diff --git a/tasks/vla/train_lingbotvla.py b/tasks/vla/train_lingbotvla.py
+index 2cbb02c..09aa2b5 100644
+--- a/tasks/vla/train_lingbotvla.py
++++ b/tasks/vla/train_lingbotvla.py
+@@ -16,6 +16,7 @@ from tqdm import trange
+ from torch.utils.tensorboard import SummaryWriter
+ from lingbotvla.utils.async_tb_writer import AsyncTBWriter
+ from lingbotvla.checkpoint import build_checkpointer
++from lingbotvla.utils.dcp_rotation import keep_from_env, rotate_before_save
+ from lingbotvla.data import (
+     OmniDataCollatorWithPacking,
+     OmniDataCollatorWithPadding,
+@@ -1142,6 +1143,10 @@ def main():
+                 }
+                 if args.train.global_rank == 0:
+                     writer.flush()
++                if args.train.global_rank == 0:
++                    for removed in rotate_before_save(args.train.save_checkpoint_path, keep_from_env(), saving_step=global_step):
++                        logger.info(f"Removed old DCP before save: {removed}")
++                dist.barrier()
+                 Checkpointer.save(args.train.save_checkpoint_path, state, global_steps=global_step)
+                 dist.barrier()
+                 logger.info_rank0(f"Distributed checkpoint saved at {save_checkpoint_path} successfully!")
+@@ -1181,6 +1186,10 @@ def main():
+                         "torch_rng_state": torch.get_rng_state(),
+                     },
+                 }
++                if args.train.global_rank == 0:
++                    for removed in rotate_before_save(args.train.save_checkpoint_path, keep_from_env(), saving_step=global_step):
++                        logger.info(f"Removed old DCP before save: {removed}")
++                dist.barrier()
+                 Checkpointer.save(args.train.save_checkpoint_path, state, global_steps=global_step)
+                 dist.barrier()
+                 logger.info_rank0(f"Distributed checkpoint saved at {save_checkpoint_path} successfully!")
+@@ -1207,6 +1216,10 @@ def main():
+                     "torch_rng_state": torch.get_rng_state(),
+                 },
+             }
++            if args.train.global_rank == 0:
++                for removed in rotate_before_save(args.train.save_checkpoint_path, keep_from_env(), saving_step=global_step):
++                    logger.info(f"Removed old DCP before save: {removed}")
++            dist.barrier()
+             Checkpointer.save(args.train.save_checkpoint_path, state, global_steps=global_step)
+             dist.barrier()
+             logger.info_rank0(f"Distributed checkpoint saved at {save_checkpoint_path} successfully!")

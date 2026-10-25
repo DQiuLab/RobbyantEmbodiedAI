@@ -1,0 +1,33 @@
+diff --git a/tasks/vla/train_lingbotvla.py b/tasks/vla/train_lingbotvla.py
+index 09aa2b5..2e6cb08 100644
+--- a/tasks/vla/train_lingbotvla.py
++++ b/tasks/vla/train_lingbotvla.py
+@@ -17,6 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
+ from lingbotvla.utils.async_tb_writer import AsyncTBWriter
+ from lingbotvla.checkpoint import build_checkpointer
+ from lingbotvla.utils.dcp_rotation import keep_from_env, rotate_before_save
++from lingbotvla.utils.run_control import check_resumed, stop_requested
+ from lingbotvla.data import (
+     OmniDataCollatorWithPacking,
+     OmniDataCollatorWithPadding,
+@@ -720,6 +721,7 @@ def main():
+             logger.info_rank0("Starting training from scratch. No valid checkpoint could be loaded.")
+     else:
+         logger.info_rank0("Starting training from scratch.")
++    check_resumed(args.train.save_checkpoint_path, loaded=bool(candidates) and loaded)
+ 
+     helper.empty_cache()
+     model_fwd_context, model_bwd_context = build_activation_offloading_context(
+@@ -1158,6 +1160,12 @@ def main():
+                     current_epoch_step_for_eval,
+                 )
+ 
++            stop_flag = torch.tensor([1 if stop_requested(global_step) else 0], device="cuda")
++            dist.all_reduce(stop_flag, op=dist.ReduceOp.MAX)
++            if stop_flag.item():
++                logger.info_rank0(f"Stop requested at step {global_step}; saving and exiting.")
++                reached_max_steps = True
++                break
+             if args.train.max_steps is not None and global_step >= args.train.max_steps:
+                 logger.info_rank0(f"Reached max_steps={args.train.max_steps}, stopping training.")
+                 reached_max_steps = True
